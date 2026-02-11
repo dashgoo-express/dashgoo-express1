@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashgo Express - Pro System</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif}
+        body{background:#f4f7fa; color: #333;}
+        :root{ --navy:#0b3161; --orange:#f58220; }
+
+        /* AUTH SECTIONS */
+        #auth{position:fixed;inset:0;background:linear-gradient(135deg, var(--navy), #1a4c8a);display:flex;justify-content:center;align-items:center;z-index: 2000;}
+        .auth-box{background:#fff;padding:40px;width:380px;border-radius:25px;box-shadow:0 15px 35px rgba(0,0,0,0.2);text-align:center;}
+        .auth-logo { width: 90px; height: 90px; border-radius: 50%; border: 3px solid var(--orange); margin-bottom: 15px; object-fit: cover;}
+        .auth-box h2{color: var(--navy); font-weight: 700; margin-bottom: 20px;}
+        
+        input,textarea,select{width:100%;padding:12px;border-radius:10px;border:1px solid #ddd;margin:6px 0;font-size: 14px;}
+        button{padding:14px;border:none;border-radius:10px;background:var(--orange);color:#fff;font-weight:700;cursor:pointer;width: 100%;transition: 0.3s; margin-top: 10px;}
+        button:hover{transform: translateY(-2px); opacity: 0.9;}
+        .toggle-link{font-size: 12px; margin-top: 20px; display: block; cursor: pointer; color: var(--navy); font-weight: 600;}
+
+        /* APP LAYOUT */
+        #app{display:none}
+        .sidebar{width:260px;background:var(--navy);color:#fff;height:100vh;position:fixed;padding: 30px 15px; text-align: center;}
+        .sidebar-logo { width: 85px; height: 85px; border-radius: 50%; border: 3px solid #fff; margin-bottom: 15px; object-fit: cover; }
+        .sidebar h3 { font-size: 18px; margin-bottom: 30px; letter-spacing: 1px; }
+        .sidebar button{width:100%;padding:14px 20px;border:none;background:none;color:#cbd5e0;text-align:left;cursor:pointer;font-weight: 600; border-radius: 10px; margin-bottom: 5px; text-transform: uppercase; font-size: 12px;}
+        .sidebar button.active, .sidebar button:hover{background:var(--orange); color:#fff;}
+        
+        main{margin-left:260px;padding:40px;}
+        .card{background:#fff;padding:30px;border-radius:20px;box-shadow:0 5px 25px rgba(0,0,0,0.03); margin-bottom: 25px;}
+        .page{display:none} .page.active{display:block}
+
+        .grid-2{display: grid; grid-template-columns: 1fr 1fr; gap: 20px;}
+        .section-header{background: var(--navy); color: #fff; padding: 8px 15px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; font-weight: 600;}
+        
+        #priceTag { font-size: 2.2rem; color: var(--orange); font-weight: 800; text-align: right; margin-top: 10px;}
+        table{width:100%; border-collapse: collapse;}
+        th, td{padding: 15px; text-align: left; border-bottom: 1px solid #edf2f7; font-size: 13px;}
+        #barcodeCanvas { display: none; }
+    </style>
+</head>
+<body>
+
+<canvas id="barcodeCanvas"></canvas>
+
+<div id="auth">
+    <div class="auth-box" id="loginUI">
+        <img src="DASHGOO.jpg" class="auth-logo" onerror="this.src='https://via.placeholder.com/90?text=LOGO'">
+        <h2>LOGIN</h2>
+        <input type="text" id="userIn" placeholder="Username">
+        <input type="password" id="passIn" placeholder="Password">
+        <button onclick="doLogin()">MASUK</button>
+        <span class="toggle-link" onclick="toggleAuth('reg')">Belum punya akun? Daftar</span>
+    </div>
+
+    <div class="auth-box" id="regUI" style="display:none">
+        <img src="DASHGOO.jpg" class="auth-logo" onerror="this.src='https://via.placeholder.com/90?text=LOGO'">
+        <h2>DAFTAR</h2>
+        <input type="text" id="regUser" placeholder="Username Baru">
+        <input type="password" id="regPass" placeholder="Password Baru">
+        <button onclick="doRegister()">DAFTAR SEKARANG</button>
+        <span class="toggle-link" onclick="toggleAuth('login')">Sudah punya akun? Login</span>
+    </div>
+</div>
+
+<div id="app">
+    <div class="sidebar">
+        <img src="DASHGOO.jpg" class="sidebar-logo" onerror="this.src='https://via.placeholder.com/85?text=LOGO'">
+        <h3 id="displayUserRole">DASHGO EXPRESS</h3>
+        
+        <button onclick="nav('dash')" id="btn-dash" class="active">DASHBOARD</button>
+        
+        <div id="admin-menu">
+            <button onclick="nav('input')" id="btn-input">BUAT RESI BARU</button>
+            <button onclick="nav('hist')" id="btn-hist">RIWAYAT DATA</button>
+        </div>
+
+        <button onclick="nav('track')" id="btn-track">CEK RESI</button>
+        
+        <button onclick="doLogout()" style="margin-top:40px; color:#ff7675">LOGOUT</button>
+    </div>
+
+    <main>
+        <div id="dash" class="page active">
+            <h2 style="margin-bottom:20px">Halo, <span id="welcomeUser">User</span>!</h2>
+            <div class="grid-2">
+                <div class="card" style="border-left: 5px solid var(--orange);">
+                    <h4 style="color:#666">Total Pengiriman</h4>
+                    <h1 id="countResi" style="font-size: 3rem; color:var(--navy)">0</h1>
+                    <p style="font-size: 12px; color: #999;">Seluruh data tersimpan di sistem</p>
+                </div>
+                <div class="card" style="border-left: 5px solid var(--navy);">
+                    <h4 style="color:#666">Status Anda</h4>
+                    <h1 id="userRoleBadge" style="font-size: 2rem; color:var(--navy); text-transform: uppercase;">-</h1>
+                </div>
+            </div>
+        </div>
+
+        <div id="track" class="page">
+            <div class="card">
+                <h3>Cek Status Pengiriman</h3>
+                <div style="display:flex; gap:10px; margin:15px 0;">
+                    <input id="custTrackInput" placeholder="Masukkan Nomor Resi (Contoh: DG12345678)">
+                    <button onclick="customerTrack()" style="width:auto;background:var(--navy)">CEK</button>
+                </div>
+                <div id="custTrackResult" style="display:none; padding:15px; border-radius:10px; background:#f8f9fa; border-left:5px solid var(--orange);"></div>
+            </div>
+        </div>
+
+        <div id="input" class="page">
+            <div class="card">
+                <form onsubmit="generateResi(event)">
+                    <div class="grid-2">
+                        <div>
+                            <div class="section-header">DATA PENGIRIM</div>
+                            <input id="sNama" placeholder="Nama Pengirim" required>
+                            <input id="sHp" placeholder="No. Telepon" required>
+                            <textarea id="sAddr" placeholder="Alamat Lengkap" rows="3" required></textarea>
+                            <select id="sProv" required><option value="">Pilih Provinsi</option></select>
+                            <input id="sKota" placeholder="Kota / Kabupaten" required>
+                            <input id="sPos" placeholder="Kode Pos">
+                        </div>
+                        <div>
+                            <div class="section-header">DATA PENERIMA</div>
+                            <input id="rNama" placeholder="Nama Penerima" required>
+                            <input id="rHp" placeholder="No. Telepon" required>
+                            <textarea id="rAddr" placeholder="Alamat Lengkap" rows="3" required></textarea>
+                            <select id="rProv" required><option value="">Pilih Provinsi</option></select>
+                            <input id="rKota" placeholder="Kota / Kabupaten" required>
+                            <input id="rPos" placeholder="Kode Pos">
+                        </div>
+                    </div>
+
+                    <div class="section-header" style="margin-top:20px">INFORMASI PAKET</div>
+                    <div class="grid-2">
+                        <div>
+                            <input type="number" id="berat" placeholder="Berat (KG)" oninput="calculatePrice()" required>
+                            <input type="number" id="jarak" placeholder="Jarak (KM)" oninput="calculatePrice()" required>
+                            <select id="layanan" onchange="calculatePrice()">
+                                <option value="Reguler">Layanan Reguler</option>
+                                <option value="Express">Layanan Express</option>
+                            </select>
+                        </div>
+                        <div>
+                            <select id="pembayaran">
+                                <option value="Tunai">Bayar Tunai</option>
+                                <option value="Transfer">Transfer Bank</option>
+                            </select>
+                            <textarea id="ket" placeholder="Keterangan Isi Barang" rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <div style="text-align:right; margin-top:20px">
+                        <p style="font-size:14px; color:#666">Total Tagihan:</p>
+                        <div id="priceTag">Rp 0</div>
+                    </div>
+                    <button type="submit" style="background:var(--navy); font-size:16px; letter-spacing:1px">PROSES & CETAK RESI</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="hist" class="page">
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; margin-bottom:20px">
+                    <h3>Data Riwayat Pengiriman</h3>
+                    <button onclick="exportExcel()" style="width:auto; padding:10px 25px; background:#27ae60">DOWNLOAD EXCEL</button>
+                </div>
+                <table>
+                    <thead>
+<tr>
+    <th>No. Resi</th>
+    <th>Pengirim</th>
+    <th>HP Pengirim</th>
+    <th>Alamat Pengirim</th>
+    <th>Penerima</th>
+    <th>HP Penerima</th>
+    <th>Tujuan</th>
+    <th>Layanan</th>
+    <th>Total</th>
+</tr>
+</thead>
+                    <tbody id="histTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    const { jsPDF } = window.jspdf;
+    const provs = ["Aceh", "Bali", "Banten", "Bengkulu", "DI Yogyakarta", "DKI Jakarta", "Gorontalo", "Jambi", "Jawa Barat", "Jawa Tengah", "Jawa Timur", "Kalimantan Barat", "Kalimantan Selatan", "Kalimantan Tengah", "Kalimantan Timur", "Kalimantan Utara", "Kepulauan Bangka Belitung", "Kepulauan Riau", "Lampung", "Maluku", "Maluku Utara", "Nusa Tenggara Barat", "Nusa Tenggara Timur", "Papua", "Papua Barat", "Papua Barat Daya", "Papua Pegunungan", "Papua Selatan", "Papua Tengah", "Riau", "Sulawesi Barat", "Sulawesi Selatan", "Sulawesi Tengah", "Sulawesi Tenggara", "Sulawesi Utara", "Sumatera Barat", "Sumatera Selatan", "Sumatera Utara"];
+
+    let db = JSON.parse(localStorage.getItem('dg_data')) || [];
+    let users = JSON.parse(localStorage.getItem('dg_users')) || [{u:'admin', p:'admin123'}];
+    let curUser = "";
+
+    function init() {
+        const sp = document.getElementById('sProv');
+        const rp = document.getElementById('rProv');
+        provs.sort().forEach(p => {
+            sp.add(new Option(p, p));
+            rp.add(new Option(p, p));
+        });
+        updateDashboardStats();
+    }
+    init();
+
+    function updateDashboardStats() {
+        document.getElementById('countResi').innerText = db.length;
+    }
+
+    function toggleAuth(m) {
+        document.getElementById('loginUI').style.display = m === 'reg' ? 'none' : 'block';
+        document.getElementById('regUI').style.display = m === 'reg' ? 'block' : 'none';
+    }
+
+    function doRegister() {
+        let u = document.getElementById('regUser').value.trim();
+        let p = document.getElementById('regPass').value.trim();
+        if(!u || !p) return alert("Harap isi username dan password!");
+        users.push({u, p});
+        localStorage.setItem('dg_users', JSON.stringify(users));
+        alert("Pendaftaran Berhasil! Silakan Login."); 
+        toggleAuth('login');
+    }
+
+    function doLogin() {
+        let u = document.getElementById('userIn').value.trim();
+        let p = document.getElementById('passIn').value.trim();
+
+        let found = users.find(user => user.u === u && user.p === p);
+
+        if(found){
+            curUser = u;
+            document.getElementById('auth').style.display = 'none';
+            document.getElementById('app').style.display = 'block';
+            document.getElementById('welcomeUser').innerText = u;
+            
+            // ROLE CONTROL
+            const isAdmin = u.toLowerCase() === 'admin';
+            document.getElementById('admin-menu').style.display = isAdmin ? 'block' : 'none';
+            document.getElementById('userRoleBadge').innerText = isAdmin ? 'Admin' : 'Customer';
+            
+            updateDashboardStats();
+            renderTable();
+            nav('dash');
+        } else {
+            alert("Username / Password salah!");
+        }
+    }
+
+    function nav(p) {
+        document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
+        document.getElementById(p).classList.add('active');
+        document.querySelectorAll('.sidebar button').forEach(b => b.classList.remove('active'));
+        let btn = document.getElementById('btn-'+p);
+        if(btn) btn.classList.add('active');
+    }
+
+    function calculatePrice() {
+        let b = parseFloat(document.getElementById('berat').value) || 0;
+        let j = parseFloat(document.getElementById('jarak').value) || 0;
+        let l = document.getElementById('layanan').value;
+        let total = (l === "Reguler") ? 
+                    (20000 + (b > 5 ? (b-5)*1000 : 0) + (j * 1500)) : 
+                    (22000 + (b > 5 ? (b-5)*2000 : 0) + (j * 2500));
+        document.getElementById('priceTag').innerText = "Rp " + total.toLocaleString('id-ID');
+        return total;
+    }
+
+    function generateResi(e) {
+        e.preventDefault();
+        let resi = "DG" + Date.now().toString().slice(-8);
+        let data = {
+            resi, date: new Date().toLocaleDateString('id-ID'), admin: curUser,
+            sn: document.getElementById('sNama').value, sh: document.getElementById('sHp').value, sa: document.getElementById('sAddr').value, sk: document.getElementById('sKota').value, sp: document.getElementById('sProv').value, spos: document.getElementById('sPos').value,
+            rn: document.getElementById('rNama').value, rh: document.getElementById('rHp').value, ra: document.getElementById('rAddr').value, rk: document.getElementById('rKota').value, rp: document.getElementById('rProv').value, rpos: document.getElementById('rPos').value,
+            layanan: document.getElementById('layanan').value, berat: document.getElementById('berat').value, bayar: document.getElementById('pembayaran').value, price: calculatePrice(), ket: document.getElementById('ket').value
+        };
+        db.push(data);
+        localStorage.setItem('dg_data', JSON.stringify(db));
+
+        // Update Dashboard Instant
+        updateDashboardStats();
+
+        // PDF Generation
+        JsBarcode("#barcodeCanvas", resi, {format: "CODE128", height: 50, displayValue: false});
+        let bc = document.getElementById('barcodeCanvas').toDataURL();
+
+        setTimeout(() => {
+
+let doc = new jsPDF({unit:'mm', format:[105,155]});
+
+const ORANGE = [245,130,32];
+const NAVY   = [11,49,97];
+
+// HEADER
+doc.setFillColor(...NAVY);
+doc.rect(0,0,105,22,'F');
+
+doc.setTextColor(255);
+doc.setFontSize(16);
+doc.setFont("helvetica","bold");
+doc.text("DASHGO EXPRESS",52.5,13,{align:'center'});
+
+// STRIP
+doc.setFillColor(...ORANGE);
+doc.rect(0,22,105,3,'F');
+
+// BARCODE
+doc.addImage(bc,'PNG',20,28,65,14);
+
+// RESI & TANGGAL (TANPA BOX)
+doc.setTextColor(0);
+doc.setFontSize(10);
+
+let now = new Date().toLocaleString('id-ID');
+
+doc.text("No Resi : "+resi,8,46);
+doc.text("Tanggal : "+now,8,51);
+
+let y = 57;
+const margin = 6;
+const width = 93;
+
+
+// ===== BOX FUNCTION =====
+function section(title,height){
+
+    // Judul
+    doc.setFillColor(...ORANGE);
+    doc.rect(margin,y,width,6,'F');
+
+    doc.setTextColor(255);
+    doc.setFontSize(9);
+    doc.setFont("helvetica","bold");
+    doc.text(title, margin+3, y+4);
+
+    y+=6;
+
+    // Kotak isi
+    doc.setDrawColor(...ORANGE);
+    doc.setLineWidth(0.4);
+    doc.rect(margin,y,width,height);
+
+    doc.setTextColor(0);
+    doc.setFont("helvetica","normal");
+
+    y+=4;
+}
+
+doc.setFontSize(9);
+
+
+// ===== PENGIRIM =====
+section("DATA PENGIRIM",18);
+
+doc.text("Nama   : "+data.sn,8,y); y+=4;
+doc.text("HP     : "+data.sh,8,y); y+=4;
+doc.text("Alamat : "+data.sa,8,y); y+=7;
+
+
+// ===== PENERIMA =====
+section("DATA PENERIMA",18);
+
+doc.text("Nama   : "+data.rn,8,y); y+=4;
+doc.text("HP     : "+data.rh,8,y); y+=4;
+doc.text("Alamat : "+data.ra,8,y); y+=7;
+
+
+// ===== INFO PAKET =====
+section("INFO PAKET",20);
+
+doc.text("Bayar   : "+data.bayar,8,y); y+=4;
+doc.text("Berat   : "+data.berat+" KG",8,y); y+=4;
+doc.text("Layanan : "+data.layanan,8,y); y+=4;
+doc.text("Isi     : "+(data.ket||"-"),8,y); y+=6;
+
+
+// ===== TOTAL =====
+doc.setFillColor(...ORANGE);
+doc.rect(margin,y,width,9,'F');
+
+doc.setTextColor(255);
+doc.setFontSize(11);
+doc.setFont("helvetica","bold");
+
+doc.text(
+    "TOTAL : Rp "+data.price.toLocaleString('id-ID'),
+    52.5,
+    y+6,
+    {align:'center'}
+);
+
+
+// SAVE
+doc.save(`Resi_${resi}.pdf`);
+
+renderTable();
+nav('hist');
+
+},500);
+    }
+
+    function renderTable() {
+    let tb = document.getElementById('histTable');
+    if(!tb) return;
+
+    tb.innerHTML = "";
+
+    db.slice().reverse().forEach(d => {
+
+        tb.innerHTML += `
+        <tr>
+            <td><b>${d.resi}</b></td>
+
+            <td>${d.sn}</td>
+            <td>${d.sh}</td>
+            <td>${d.sa}</td>
+
+            <td>${d.rn}</td>
+            <td>${d.rh}</td>
+
+            <td>${d.rk}</td>
+            <td>${d.layanan}</td>
+
+            <td>Rp ${d.price.toLocaleString('id-ID')}</td>
+        </tr>
+        `;
+    });
+    }
+
+    function doLogout() {
+        if(confirm("Logout dari sistem?")) {
+            location.reload();
+        }
+    }
+
+    function exportExcel() {
+        const ws = XLSX.utils.json_to_sheet(db);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Data");
+        XLSX.writeFile(wb, "Laporan_Dashgo.xlsx");
+    }
+// ================= TRACKING CUSTOMER =================
+function customerTrack(){
+
+    let resi = document.getElementById('custTrackInput').value.trim();
+    let box  = document.getElementById('custTrackResult');
+
+    if(!resi){
+        alert("Masukkan nomor resi dulu!");
+        return;
+    }
+
+    let data = db.find(d => d.resi === resi);
+
+    if(!data){
+        box.style.display = "block";
+        box.innerHTML = `
+            <b style="color:red">❌ Resi tidak ditemukan</b>
+            <p>Pastikan nomor resi benar</p>
+        `;
+        return;
+    }
+
+    box.style.display = "block";
+
+    box.innerHTML = `
+        <h4 style="color:#0b3161">📦 Status Pengiriman</h4>
+
+        <p><b>No Resi:</b> ${data.resi}</p>
+        <p><b>Tanggal:</b> ${data.date}</p>
+
+        <p><b>Pengirim:</b> ${data.sn}</p>
+        <p><b>HP Pengirim:</b> ${data.sh}</p>
+
+        <p><b>Penerima:</b> ${data.rn}</p>
+        <p><b>HP Penerima:</b> ${data.rh}</p>
+
+        <p><b>Tujuan:</b> ${data.rk}, ${data.rp}</p>
+        <p><b>Layanan:</b> ${data.layanan}</p>
+
+        <p><b>Status:</b> <span style="color:green;font-weight:600">
+            Dalam Pengiriman 🚚
+        </span></p>
+
+        <p><b>Total:</b> Rp ${data.price.toLocaleString('id-ID')}</p>
+    `;
+    }
+</script>
+</body>
+</html>
